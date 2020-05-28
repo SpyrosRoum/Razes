@@ -1,0 +1,11 @@
+[package]
+name = "razes"
+version = "0.1.0"
+authors = ["Spyros Roum <spyrosr1@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+structopt = "0.3"
+image = "0.23"
+rand = "0.7"
+ndarray = "0.13"
