@@ -2,76 +2,168 @@
 
 // Choose the initial cell, mark it as visited and push it to the stack
 // While the stack is not empty
-//     Pop a cell from the stack and make it a current cell
+//     Pop a cell from the stack and make it the current cell
 //     If the current cell has any neighbours which have not been visited
 //         Push the current cell to the stack
 //         Choose one of the unvisited neighbours
 //         Remove the wall between the current cell and the chosen cell
 //         Mark the chosen cell as visited and push it to the stack
 
-use image::{Rgb, RgbImage};
-use ndarray::prelude::*;
-use ndarray::{Array, OwnedRepr};
+use image::{ImageBuffer, Rgb, RgbImage};
 use rand::prelude::*;
-use rand::seq::SliceRandom;
-
-use std::time::Instant;
 
 static WHITE: Rgb<u8> = Rgb([255u8, 255u8, 255u8]);
-static BLACK: Rgb<u8> = Rgb([0u8, 0u8, 0u8]);
+
+fn img_idx(x: usize, y: usize) -> (u32, u32) {
+    // grid index to image index
+    ((x * 2 + 1) as u32, (y * 2 + 1) as u32)
+}
+
+fn open_img(img: &mut ImageBuffer<Rgb<u8>, Vec<u8>>, grid_x: usize, grid_y: usize) {
+    let (img_x, img_y) = img_idx(grid_x, grid_y);
+    img.put_pixel(img_x, img_y, WHITE);
+}
+
+fn open_between(img: &mut ImageBuffer<Rgb<u8>, Vec<u8>>, a: (usize, usize), b: (usize, usize)) {
+    let (a_x, a_y) = a;
+    let (b_x, b_y) = b;
+    let (img_ax, img_ay) = img_idx(a_x, a_y);
+    let (img_bx, img_by) = img_idx(b_x, b_y);
+
+    if img_ax > img_bx {
+        if img_ay == img_by {
+            // Same row, a is to the right of b
+            img.put_pixel(img_ax - 1, img_ay, WHITE);
+        }
+    } else if img_ax < img_bx {
+        if img_ay == img_by {
+            // Same row, a is to the left of b
+            img.put_pixel(img_ax + 1, img_ay, WHITE);
+        }
+    } else if img_ax == img_bx {
+        if img_ay > img_by {
+            // a is above b
+            img.put_pixel(img_ax, img_ay - 1, WHITE);
+        } else if img_ay < img_by {
+            // a is under b
+            img.put_pixel(img_ax, img_ay + 1, WHITE);
+        }
+    }
+}
 
 #[derive(Copy, Clone)]
 struct Cell {
-    row: usize,
-    col: usize,
+    x: usize,
+    y: usize,
+    wall: bool,
 }
 
 impl Cell {
-    fn new(row: usize, col: usize) -> Self {
-        Cell { row, col }
+    fn new(x: usize, y: usize) -> Self {
+        Cell { x, y, wall: true }
     }
 
-    fn above(&self, maze: RgbImage) -> Option<Self> {
-        
-    }
-
-    fn to_img(&self) -> (u32, u32) {
-        (self.row as u32 * 2 + 1, self.col as u32 * 2 + 1)
+    fn open(&mut self, img: &mut ImageBuffer<Rgb<u8>, Vec<u8>>) {
+        self.wall = false;
+        open_img(img, self.x, self.y);
     }
 }
 
-pub fn generate(width: u32, height: u32, of: String, time_it: bool) {
-    // For timing it
-    let start_time = Instant::now();
-    let mut rng = rand::thread_rng();
+#[derive(Clone)]
+pub struct Generator {
+    grid: Vec<Vec<Cell>>,
+    width: usize,
+    height: usize,
+}
 
-    // To account for walls
-    let mut maze = RgbImage::new(width, height);
+impl Generator {
+    pub fn new(width: usize, height: usize) -> Self {
+        let mut grid = Vec::with_capacity(height);
 
-    let mut cells = Array::<u8, Ix2>::zeros((width as usize, height as usize).f());
+        for y in 0..height {
+            let mut row = Vec::with_capacity(width);
+            for x in 0..width {
+                let cell = Cell::new(x, y);
+                row.push(cell);
+            }
+            grid.push(row);
+        }
 
-    first = Cell::new(
-        rng.gen_range(0, height),
-        rng.gen_range(0, width)
-    );
-
-    maze.put_pixel(first.col, first.row, WHITE);
-
-    // To work as a LiFo queue
-    let mut stack = Vec::new();
-    stack.push(first);
-
-    while !stack.is_empty() {
-        cur = stack.pop();
-
-        neighbours: Vec<Cell> = vec![];
-
-
+        Generator {
+            grid,
+            width,
+            height,
+        }
     }
 
+    pub fn generate(&mut self) -> RgbImage {
+        let mut rng = rand::thread_rng();
 
-    if time_it {
-        println!("It took {} seconds to generate the maze.", start_time.elapsed().as_secs_f64())
+        // * 2 + 1 to account for walls
+        let mut maze = ImageBuffer::new((self.width * 2 + 1) as u32, (self.height * 2 + 1) as u32);
+
+        let mut stack: Vec<(usize, usize)> = Vec::new();
+
+        let x = rng.gen_range(0, self.width - 1);
+
+        let first = &mut self.grid[0][x];
+        first.open(&mut maze);
+        stack.push((first.x, first.y));
+
+        // Open entry, so one above first
+        maze.put_pixel((first.x * 2 + 1) as u32, 0u32, WHITE);
+        // Exit
+        maze.put_pixel((self.width * 2 - 1) as u32, (self.height * 2) as u32, WHITE);
+
+
+        while !stack.is_empty() {
+            let (cur_x, cur_y) = stack.pop().unwrap();
+            let neighbours = self.get_close_neighbours(cur_x, cur_y);
+
+            if !neighbours.is_empty() {
+                let rand_idx = rng.gen_range(0, neighbours.len());
+                let (next_x, next_y) = neighbours[rand_idx];
+
+                open_between(&mut maze, (cur_x, cur_y), (next_x, next_y));
+                self.grid[next_y][next_x].open(&mut maze);
+
+                stack.push((cur_x, cur_y));
+                stack.push((next_x, next_y));
+            }
+        }
+
+        maze
     }
-    maze.save(of).expect("Error saving the maze.");
+
+    fn get_close_neighbours(&self, x: usize, y: usize) -> Vec<(usize, usize)> {
+        // Find all the closed neighbours
+        let mut neighbours = Vec::new();
+
+        if y > 0 {
+            // above
+            if self.grid[y - 1][x].wall {
+                neighbours.push((x, y - 1));
+            }
+        }
+        if y < self.height - 1 {
+            // under
+            if self.grid[y + 1][x].wall {
+                neighbours.push((x, y + 1));
+            }
+        }
+        if x > 0 {
+            // left
+            if self.grid[y][x - 1].wall {
+                neighbours.push((x - 1, y));
+            }
+        }
+        if x < self.width - 1 {
+            // right
+            if self.grid[y][x + 1].wall {
+                neighbours.push((x + 1, y));
+            }
+        }
+
+        neighbours
+    }
 }
