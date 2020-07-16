@@ -6,19 +6,15 @@ use args::{Args, Command};
 use std::time::Instant;
 
 use generator::Generator;
-use solver::Solver;
 use image::RgbImage;
-
+use solver::Solver;
 
 fn time_it<T, F: FnMut(T) -> RgbImage>(fun: F, for_: T) -> RgbImage {
     let start_time = Instant::now();
 
     let img = fun(for_);
 
-    println!(
-        "It took {} seconds.",
-        start_time.elapsed().as_secs_f64()
-    );
+    println!("It took {} seconds.", start_time.elapsed().as_secs_f64());
 
     img
 }
@@ -35,11 +31,10 @@ fn main() {
             let mut gen = Generator::new(width as usize, height as usize);
 
             let img = if args.time_it {
-                    time_it(Generator::generate, &mut gen)
+                time_it(Generator::generate, &mut gen)
             } else {
                 gen.generate()
             };
-
 
             println!("Saving as {}..", output_file);
             img.save(output_file).expect("Error saving the maze.");

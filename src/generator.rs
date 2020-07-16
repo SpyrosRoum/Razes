@@ -88,7 +88,6 @@ impl Generator {
         // Exit
         maze.put_pixel((self.width * 2 - 1) as u32, (self.height * 2) as u32, WHITE);
 
-
         while !stack.is_empty() {
             let (cur_x, cur_y) = stack.pop().unwrap();
             let neighbours = self.get_close_neighbours(cur_x, cur_y);
@@ -101,7 +100,11 @@ impl Generator {
                 // This works because `next_cell.row + row + 1` is basically the average of the pixels position,
                 // Which means between the two!
                 // https://canary.discordapp.com/channels/434207294184620043/434352882507317250/732979707754315844
-                maze.put_pixel((next_x + cur_x + 1) as u32, (next_y + cur_y + 1) as u32, WHITE);
+                maze.put_pixel(
+                    (next_x + cur_x + 1) as u32,
+                    (next_y + cur_y + 1) as u32,
+                    WHITE,
+                );
 
                 self.grid[next_y][next_x].open(&mut maze);
 
