@@ -24,33 +24,6 @@ fn open_img(img: &mut ImageBuffer<Rgb<u8>, Vec<u8>>, grid_x: usize, grid_y: usiz
     img.put_pixel(img_x, img_y, WHITE);
 }
 
-fn open_between(img: &mut ImageBuffer<Rgb<u8>, Vec<u8>>, a: (usize, usize), b: (usize, usize)) {
-    let (a_x, a_y) = a;
-    let (b_x, b_y) = b;
-    let (img_ax, img_ay) = img_idx(a_x, a_y);
-    let (img_bx, img_by) = img_idx(b_x, b_y);
-
-    if img_ax > img_bx {
-        if img_ay == img_by {
-            // Same row, a is to the right of b
-            img.put_pixel(img_ax - 1, img_ay, WHITE);
-        }
-    } else if img_ax < img_bx {
-        if img_ay == img_by {
-            // Same row, a is to the left of b
-            img.put_pixel(img_ax + 1, img_ay, WHITE);
-        }
-    } else if img_ax == img_bx {
-        if img_ay > img_by {
-            // a is above b
-            img.put_pixel(img_ax, img_ay - 1, WHITE);
-        } else if img_ay < img_by {
-            // a is under b
-            img.put_pixel(img_ax, img_ay + 1, WHITE);
-        }
-    }
-}
-
 #[derive(Copy, Clone)]
 struct Cell {
     x: usize,
@@ -124,7 +97,12 @@ impl Generator {
                 let rand_idx = rng.gen_range(0, neighbours.len());
                 let (next_x, next_y) = neighbours[rand_idx];
 
-                open_between(&mut maze, (cur_x, cur_y), (next_x, next_y));
+                // remove wall
+                // This works because `next_cell.row + row + 1` is basically the average of the pixels position,
+                // Which means between the two!
+                // https://canary.discordapp.com/channels/434207294184620043/434352882507317250/732979707754315844
+                maze.put_pixel((next_x + cur_x + 1) as u32, (next_y + cur_y + 1) as u32, WHITE);
+
                 self.grid[next_y][next_x].open(&mut maze);
 
                 stack.push((cur_x, cur_y));
